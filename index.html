@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SB WasteTrack — Barangay San Bartolome</title>
+  <meta name="description" content="Live GPS tracking of garbage trucks and household reporting for Barangay San Bartolome, Quezon City." />
+  <link rel="icon" type="image/png" href="assets/img/favicon.png" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+            display: ['Archivo', 'system-ui', 'sans-serif'],
+            sign: ['Anton', 'Impact', 'Arial Narrow Bold', 'sans-serif'],
+          },
+          colors: {
+            brand: { 50:'#effaf0',100:'#d9f2dc',200:'#b2e4b8',300:'#84d18d',400:'#5cbf63',500:'#43ad4c',600:'#2f9440',700:'#1f7a33',800:'#17602a',900:'#0f4420',950:'#082a14' },
+            heart: { 500:'#e5262b', 600:'#c41d22' },
+            accent: { 400:'#f9a53e', 500:'#f28c1b', 600:'#d97306' },
+          },
+          boxShadow: { card: '0 1px 2px rgba(15,68,32,.06), 0 8px 24px -12px rgba(15,68,32,.18)' },
+        },
+      },
+    };
+  </script>
+  <link rel="stylesheet" href="assets/css/styles.css" />
+</head>
+
+<body class="bg-[#f4f7f3] font-sans text-slate-800 antialiased pb-20 lg:pb-0">
+
+  <!-- ===== Utility bar ===== -->
+  <div class="bg-brand-950 text-brand-100 text-xs">
+    <div class="mx-auto max-w-7xl px-4 h-10 flex items-center justify-between gap-3">
+      <p class="hidden sm:flex items-center gap-2 truncate">
+        <i data-lucide="map-pin" class="w-3.5 h-3.5 text-brand-300 shrink-0"></i>
+        Barangay San Bartolome · Novaliches, Lungsod Quezon
+        <a href="tel:+63282776775" class="hidden md:inline-flex items-center gap-1.5 ml-3 hover:text-white"><i data-lucide="phone" class="w-3.5 h-3.5 text-brand-300"></i>(02) 8277 6775</a>
+      </p>
+      <p class="hidden xl:flex items-center gap-2 ml-auto">
+        <span class="relative flex h-2 w-2"><span class="absolute inline-flex h-full w-full rounded-full bg-accent-400 opacity-75 animate-ping"></span><span class="relative inline-flex h-2 w-2 rounded-full bg-accent-500"></span></span>
+        <span id="clock">—</span>
+      </p>
+      <div class="flex items-center gap-2 shrink-0 ml-auto xl:ml-0">
+        <!-- Language -->
+        <div id="langSwitch" class="role-switch" role="group" data-i18n-aria="lang.label" aria-label="Language">
+          <button data-lang="en" lang="en">EN</button>
+          <button data-lang="tl" lang="fil">TL</button>
+        </div>
+        <!-- Demo role switch (no login yet) -->
+        <div id="roleSwitch" class="role-switch" role="tablist" data-i18n-aria="role.label" aria-label="View as">
+          <button data-role="resident" role="tab" data-i18n="role.resident">Household</button>
+          <button data-role="driver" role="tab" data-i18n="role.driver">Driver</button>
+          <button data-role="admin" role="tab" data-i18n="role.admin">Management</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Header ===== -->
+  <header class="sticky top-0 z-[1000] bg-white/90 backdrop-blur border-b border-brand-100">
+    <div class="mx-auto max-w-7xl px-4 h-16 flex items-center gap-6">
+      <a href="#top" class="flex items-center gap-3 shrink-0">
+        <img src="assets/img/brgy-logo.png" alt="Barangay San Bartolome seal" class="w-11 h-11 rounded-full" />
+        <span class="leading-tight">
+          <span class="flex items-center gap-1 font-sign uppercase text-brand-600 text-xl leading-none tracking-wide">SB <svg viewBox="0 0 24 24" class="w-4 h-4 text-heart-500" fill="currentColor" aria-hidden="true"><path d="M12 21s-7.5-4.6-10-9.4C.4 8.300 2.300 4.500 6 4.500c2.200 0 3.900 1.200 6 3.600 2.100-2.400 3.800-3.600 6-3.600 3.700 0 5.600 3.800 4 7.100C19.500 16.400 12 21 12 21z"/></svg> WasteTrack</span>
+          <span class="block text-[11px] text-slate-500 font-medium" data-i18n="brand.tagline">Real-time garbage truck tracker</span>
+        </span>
+      </a>
+
+      <nav class="hidden lg:flex items-center gap-1 text-sm font-semibold text-slate-600 ml-4" aria-label="Main">
+        <a href="#track" class="nav-link" data-i18n="nav.map">Live Map</a>
+        <a href="#schedule" class="nav-link" data-i18n="nav.schedule">Schedule</a>
+        <a href="#report" class="nav-link" data-i18n="nav.report">Report Garbage</a>
+        <a href="#history" class="nav-link" data-i18n="nav.history">History</a>
+        <a href="#about" class="nav-link" data-i18n="nav.about">About</a>
+      </nav>
+
+      <div class="ml-auto flex items-center gap-2">
+        <button id="bellBtn" class="relative grid place-items-center w-10 h-10 rounded-xl border border-slate-200 hover:bg-brand-50 transition" data-i18n-aria="notif.title" aria-label="Notifications">
+          <i data-lucide="bell" class="w-5 h-5 text-brand-700"></i>
+          <span id="bellCount" class="hidden absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center">0</span>
+        </button>
+        <a href="#report" class="hidden sm:inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-heart-500 hover:bg-heart-600 text-white text-sm font-bold shadow-sm transition">
+          <i data-lucide="megaphone" class="w-4 h-4"></i> <span data-i18n="nav.report">Report Garbage</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main id="top">
+
+    <!-- ===== Driver console (rendered by app.js) ===== -->
+    <section id="viewDriver" class="hidden mx-auto max-w-6xl px-4 py-10"></section>
+
+    <!-- ===== Management console (rendered by app.js) ===== -->
+    <section id="viewAdmin" class="hidden mx-auto max-w-7xl px-4 py-10"></section>
+
+    <div id="viewResident">
+    <!-- Barangay announcements that affect the chosen area -->
+    <div id="annBanner" aria-live="polite"></div>
+
+    <!-- ===== Hero ===== -->
+    <section class="relative overflow-hidden bg-brand-950 text-white">
+      <!-- Barangay hall + "I ♥ San Bartolome" sign -->
+      <img src="assets/img/hero-san-bartolome.webp" alt="" data-i18n-alt="hero.alt"
+           class="absolute inset-0 w-full h-full object-cover object-[78%_60%] lg:object-[50%_62%]" />
+      <div class="absolute inset-0 hero-shade" aria-hidden="true"></div>
+
+      <div class="relative mx-auto max-w-7xl px-4 pt-12 pb-40 sm:pt-16 lg:pt-20 lg:pb-44">
+        <div class="max-w-xl">
+          <p class="sign-badge">
+            <span>I</span>
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-label="love" role="img"><path d="M12 21s-7.5-4.6-10-9.4C.4 8.300 2.300 4.500 6 4.500c2.200 0 3.900 1.200 6 3.600 2.100-2.400 3.800-3.600 6-3.600 3.700 0 5.600 3.800 4 7.100C19.500 16.400 12 21 12 21z"/></svg>
+            <span>San Bartolome</span>
+          </p>
+          <h1 class="mt-4 font-sign uppercase text-5xl sm:text-6xl lg:text-7xl leading-[0.98] tracking-wide hero-text" data-i18n-html="hero.title">
+            Know where<br />the <span class="text-brand-400">truck</span> is.
+          </h1>
+          <p class="mt-5 text-white/90 text-lg max-w-lg hero-text" data-i18n="hero.lead">
+            Watch the barangay garbage trucks move in real time, get notified before they reach your street,
+            and report garbage that's piling up — all in one place.
+          </p>
+          <div class="mt-8 flex flex-wrap gap-3">
+            <a href="#track" class="inline-flex items-center gap-2 h-12 px-6 rounded-xl bg-heart-500 hover:bg-heart-600 font-bold shadow-lg shadow-black/30 transition">
+              <i data-lucide="navigation" class="w-5 h-5"></i> <span data-i18n="hero.track">Track the Truck</span>
+            </a>
+            <a href="#report" class="inline-flex items-center gap-2 h-12 px-6 rounded-xl bg-white text-brand-800 hover:bg-brand-50 font-bold shadow-lg shadow-black/30 transition">
+              <i data-lucide="camera" class="w-5 h-5"></i> <span data-i18n="hero.report">Report a Pile-up</span>
+            </a>
+          </div>
+          <dl class="mt-9 grid grid-cols-3 max-w-md gap-4 hero-text">
+            <div><dt class="text-xs text-white/80" data-i18n="hero.statTrucks">Trucks on duty</dt><dd id="statTrucks" class="font-sign text-4xl">—</dd></div>
+            <div><dt class="text-xs text-white/80" data-i18n="hero.statAreas">Areas covered</dt><dd id="statAreas" class="font-sign text-4xl">—</dd></div>
+            <div><dt class="text-xs text-white/80" data-i18n="hero.statReports">Open reports</dt><dd id="statReports" class="font-sign text-4xl">—</dd></div>
+          </dl>
+        </div>
+      </div>
+    </section>
+
+    <!-- My area card — overlaps the bottom of the hero photo -->
+    <div class="relative z-10 mx-auto max-w-7xl px-4 -mt-28 lg:-mt-32">
+      <div class="bg-white text-slate-800 rounded-3xl shadow-2xl ring-1 ring-black/5 p-5 lg:p-6 grid gap-5 lg:grid-cols-[1.1fr_1.5fr_1fr] lg:items-center">
+        <div>
+          <div class="flex items-center justify-between gap-3">
+            <h2 class="font-sign uppercase tracking-wide text-2xl text-brand-600" data-i18n="hero.hello">Hello, Household!</h2>
+            <span id="todayBadge" class="text-xs font-semibold rounded-full px-2.5 py-1 bg-brand-50 text-brand-700">—</span>
+          </div>
+          <label for="areaSelect" class="mt-3 block text-xs font-semibold text-slate-500 uppercase tracking-wide" data-i18n="hero.myArea">My area / street</label>
+          <div class="mt-1 relative">
+            <i data-lucide="map-pin" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-brand-600 pointer-events-none"></i>
+            <select id="areaSelect" class="w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-9 py-3 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500"></select>
+            <i data-lucide="chevron-down" class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none"></i>
+          </div>
+        </div>
+
+        <div>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="rounded-2xl bg-brand-50 p-4">
+              <p class="flex items-center gap-1.5 text-xs font-semibold text-brand-700"><i data-lucide="calendar-days" class="w-4 h-4"></i> <span data-i18n="hero.next">Next collection</span></p>
+              <p id="nextDate" class="mt-1 font-display font-800 text-lg leading-tight">—</p>
+              <p id="nextDays" class="text-xs text-slate-500 mt-0.5">—</p>
+            </div>
+            <div class="rounded-2xl bg-accent-500/10 p-4">
+              <p class="flex items-center gap-1.5 text-xs font-semibold text-accent-600"><i data-lucide="timer" class="w-4 h-4"></i> <span data-i18n="hero.eta">Truck ETA</span></p>
+              <p id="heroEta" class="mt-1 font-display font-800 text-lg leading-tight">—</p>
+              <p id="heroTruck" class="text-xs text-slate-500 mt-0.5">—</p>
+            </div>
+          </div>
+          <ol id="miniTimeline" class="mt-4 flex items-center justify-between text-[10px] font-semibold text-slate-400"></ol>
+        </div>
+
+        <div class="grid grid-cols-2 lg:grid-cols-1 gap-3">
+          <a href="#track" class="inline-flex justify-center items-center gap-2 h-11 rounded-xl bg-brand-700 hover:bg-brand-800 text-white text-sm font-bold transition"><i data-lucide="truck" class="w-4 h-4"></i> <span data-i18n="hero.trackCollection">Track Collection</span></a>
+          <button data-open-missed class="inline-flex justify-center items-center gap-2 h-11 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-sm font-bold transition"><i data-lucide="alert-triangle" class="w-4 h-4"></i> <span data-i18n="hero.missed">Missed Pickup</span></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== Ticker ===== -->
+    <div class="mt-10 bg-brand-600 text-white overflow-hidden" aria-hidden="true">
+      <div class="ticker flex whitespace-nowrap py-3 font-sign uppercase tracking-widest text-base">
+        <span class="ticker-item" data-i18n="tick.1">Live GPS Tracking</span><span class="ticker-item" data-i18n="tick.2">ETA Notifications</span><span class="ticker-item" data-i18n="tick.3">Report Piling Garbage</span><span class="ticker-item" data-i18n="tick.4">Pickup Confirmation</span><span class="ticker-item" data-i18n="tick.5">Household Feedback</span><span class="ticker-item" data-i18n="tick.6">Collection Area Photo</span>
+        <span class="ticker-item" data-i18n="tick.1">Live GPS Tracking</span><span class="ticker-item" data-i18n="tick.2">ETA Notifications</span><span class="ticker-item" data-i18n="tick.3">Report Piling Garbage</span><span class="ticker-item" data-i18n="tick.4">Pickup Confirmation</span><span class="ticker-item" data-i18n="tick.5">Household Feedback</span><span class="ticker-item" data-i18n="tick.6">Collection Area Photo</span>
+      </div>
+    </div>
+
+    <!-- ===== Live tracking ===== -->
+    <section id="track" class="scroll-mt-20 mx-auto max-w-7xl px-4 py-16">
+      <div class="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p class="section-eyebrow" data-i18n="track.eyebrow">Live tracking</p>
+          <h2 class="section-title" data-i18n="track.title">Where are the trucks right now?</h2>
+        </div>
+        <div class="flex flex-wrap items-center gap-2 text-xs">
+          <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-100 text-amber-800 px-3 py-1 font-semibold">
+            <i data-lucide="flask-conical" class="w-3.5 h-3.5"></i> <span data-i18n="track.demo">Demo feed · simulated GPS</span>
+          </span>
+          <button data-act="reset-demo" class="inline-flex items-center gap-1.5 rounded-full bg-white ring-1 ring-slate-200 px-3 py-1 font-semibold hover:bg-slate-50">
+            <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> <span data-i18n="track.restart">Restart demo day</span>
+          </button>
+          <label class="inline-flex items-center gap-2 rounded-full bg-white ring-1 ring-slate-200 px-3 py-1 font-semibold cursor-pointer">
+            <input id="showReports" type="checkbox" checked class="accent-red-600" /> <span data-i18n="track.showReports">Show reports</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="mt-8 grid lg:grid-cols-[1fr_380px] gap-6">
+        <!-- self-start: the box stays the map's height instead of stretching to the tall sidebar;
+             sticky keeps the map in view while the sidebar scrolls on desktop -->
+        <div class="relative self-start lg:sticky lg:top-24 rounded-3xl overflow-hidden shadow-card ring-1 ring-brand-100 bg-white">
+          <div id="map" class="h-[460px] lg:h-[620px] w-full"></div>
+          <div id="pickHint" class="hidden absolute top-4 left-1/2 -translate-x-1/2 z-[500] rounded-full bg-red-600 text-white text-sm font-bold px-4 py-2 shadow-lg" data-i18n="track.pickHint">
+            Tap the map to pin the garbage location
+          </div>
+          <div class="absolute bottom-4 left-4 z-[500] flex flex-wrap gap-2" id="legend"></div>
+        </div>
+
+        <aside class="space-y-6">
+          <!-- My collection tracker -->
+          <div class="rounded-3xl bg-white shadow-card ring-1 ring-brand-100 p-5">
+            <div class="flex items-center justify-between">
+              <h3 class="font-display font-800 text-lg text-brand-800" data-i18n="track.collection">Track Collection</h3>
+              <span id="trackStatusPill" class="pill bg-slate-100 text-slate-600">—</span>
+            </div>
+            <p id="trackArea" class="text-xs text-slate-500 mt-0.5">—</p>
+            <ol id="timeline" class="mt-4 space-y-0"></ol>
+            <div id="proofCard"></div>
+            <div class="mt-4 flex items-center gap-3 rounded-2xl bg-brand-50 p-3">
+              <div class="grid place-items-center w-11 h-11 rounded-full bg-brand-700 text-white font-display font-800" id="driverInitials">—</div>
+              <div class="min-w-0">
+                <p id="driverName" class="font-bold text-sm truncate">—</p>
+                <p id="driverTruckLine" class="text-xs text-slate-500">—</p>
+              </div>
+              <button id="focusTruck" class="ml-auto grid place-items-center w-10 h-10 rounded-full bg-brand-700 hover:bg-brand-800 text-white transition" data-i18n-aria="track.focus" aria-label="Center map on my truck">
+                <i data-lucide="locate-fixed" class="w-5 h-5"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Fleet -->
+          <div class="rounded-3xl bg-white shadow-card ring-1 ring-brand-100 p-5">
+            <h3 class="font-display font-800 text-lg text-brand-800" data-i18n="track.fleet">Fleet on duty</h3>
+            <ul id="fleetList" class="mt-3 divide-y divide-slate-100"></ul>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ===== Report ===== -->
+    <section id="report" class="scroll-mt-20 bg-white border-y border-brand-100">
+      <div class="mx-auto max-w-7xl px-4 py-16 grid lg:grid-cols-[1fr_1fr] gap-10">
+        <div>
+          <p class="section-eyebrow text-red-600" data-i18n="rep.eyebrow">Community report</p>
+          <h2 class="section-title" data-i18n="rep.title">Garbage piling up? Report it.</h2>
+          <p class="mt-3 text-slate-600 max-w-lg" data-i18n="rep.lead">Snap a photo, pin the spot, and the barangay sanitation team gets it right away. Your report also appears on the live map so the nearest truck can pass by.</p>
+
+          <form id="reportForm" class="mt-8 space-y-5" novalidate>
+            <fieldset>
+              <legend class="field-label" data-i18n="rep.problem">What's the problem?</legend>
+              <div id="reportTypes" class="mt-2 grid grid-cols-2 gap-2"></div>
+            </fieldset>
+
+            <div>
+              <label class="field-label" for="reportArea" data-i18n="rep.area">Area</label>
+              <select id="reportArea" class="field mt-1.5"></select>
+            </div>
+
+            <div>
+              <span class="field-label" data-i18n="rep.location">Exact location</span>
+              <div class="mt-1.5 flex flex-wrap gap-2">
+                <button type="button" id="pickOnMap" class="btn-outline"><i data-lucide="map-pinned" class="w-4 h-4"></i> <span data-i18n="rep.pin">Pin on map</span></button>
+                <button type="button" id="useGps" class="btn-outline"><i data-lucide="crosshair" class="w-4 h-4"></i> <span data-i18n="rep.useLoc">Use my location</span></button>
+              </div>
+              <p id="coordsText" class="mt-2 text-xs text-slate-500" data-i18n="rep.noPin">No pin yet — area center will be used.</p>
+            </div>
+
+            <div>
+              <span class="field-label"><span data-i18n="rep.photo">Photo</span> <span class="text-red-600" data-i18n="common.required">* required</span></span>
+              <p class="text-xs text-slate-500" data-i18n="rep.stampNote">The date, time and location are stamped on the photo when you submit.</p>
+              <label id="photoDrop" class="mt-1.5 flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-300 hover:border-brand-500 bg-slate-50 p-6 cursor-pointer transition text-center">
+                <img id="photoPreview" class="hidden max-h-48 rounded-xl object-cover" alt="" />
+                <span id="photoPlaceholder" class="flex flex-col items-center gap-1 text-slate-500 text-sm"></span>
+                <input id="photoInput" type="file" accept="image/*" capture="environment" class="sr-only" />
+              </label>
+            </div>
+
+            <div>
+              <label class="field-label" for="reportNotes"><span data-i18n="rep.details">Details</span> <span class="font-normal text-slate-400" data-i18n="common.optional">(optional)</span></label>
+              <textarea id="reportNotes" rows="3" class="field mt-1.5" data-i18n-ph="rep.detailsPh"></textarea>
+            </div>
+
+            <button class="w-full h-12 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold inline-flex items-center justify-center gap-2 transition">
+              <i data-lucide="send" class="w-4 h-4"></i> <span data-i18n="rep.submit">Submit Report</span>
+            </button>
+          </form>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between">
+            <h3 class="font-display font-800 text-xl text-brand-800" data-i18n="rep.mine">My reports</h3>
+            <span id="reportCount" class="pill bg-red-50 text-red-700">—</span>
+          </div>
+          <p class="mt-1 text-xs text-slate-500" data-i18n="rep.mineHint">Status updates and replies from the barangay appear here.</p>
+          <ul id="reportList" class="mt-4 space-y-3"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Pickup history ===== -->
+    <section id="history" class="scroll-mt-20 mx-auto max-w-7xl px-4 py-16">
+      <div class="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p class="section-eyebrow" data-i18n="hist.eyebrow">My history</p>
+          <h2 class="section-title" data-i18n="hist.title">Past pickups in my area</h2>
+        </div>
+        <p id="historySummary" class="text-sm font-semibold text-brand-700"></p>
+      </div>
+      <div class="mt-6 rounded-3xl bg-white shadow-card ring-1 ring-brand-100 px-5 py-2">
+        <ul id="historyList" class="divide-y divide-slate-100"></ul>
+      </div>
+      <p class="mt-2 text-xs text-slate-500" data-i18n="hist.note">History is kept on this device for 60 days.</p>
+    </section>
+
+    <!-- ===== Schedule ===== -->
+    <section id="schedule" class="scroll-mt-20 bg-white border-y border-brand-100">
+      <div class="mx-auto max-w-7xl px-4 py-16">
+        <div class="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p class="section-eyebrow" data-i18n="sched.eyebrow">Collection schedule</p>
+            <h2 class="section-title" data-i18n="sched.title">When is collection in your area?</h2>
+            <p class="mt-2 text-sm text-slate-500 max-w-xl" data-i18n-html="sched.lead">Please put your waste outside before the truck's time window.</p>
+          </div>
+          <div class="relative w-full sm:w-72">
+            <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+            <input id="scheduleSearch" type="search" class="field pl-9" data-i18n-ph="sched.searchPh" />
+          </div>
+        </div>
+
+        <div id="schedChanges" class="mt-8"></div>
+
+        <div id="groupTabs" class="mt-6 flex gap-2 overflow-x-auto pb-2 no-scrollbar"></div>
+
+        <div class="mt-4 rounded-3xl bg-white shadow-card ring-1 ring-brand-100 overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm min-w-[720px]">
+              <thead>
+                <tr id="scheduleHead" class="bg-brand-800 text-white text-left"></tr>
+              </thead>
+              <tbody id="scheduleBody" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Community: area photo + feedback ===== -->
+    <section id="community" class="scroll-mt-20 bg-brand-50/60 border-b border-brand-100">
+      <div class="mx-auto max-w-7xl px-4 py-16 grid lg:grid-cols-2 gap-6">
+        <!-- Designated area photo -->
+        <div class="rounded-3xl bg-white shadow-card ring-1 ring-brand-100 p-6">
+          <p class="section-eyebrow" data-i18n="spot.eyebrow">Help the driver find you</p>
+          <h3 class="font-display font-800 text-2xl text-brand-800" data-i18n="spot.title">Designated collection area photo</h3>
+          <p class="mt-2 text-sm text-slate-600" data-i18n="spot.lead">Upload a photo of where you leave your garbage so the crew can spot it quickly.</p>
+          <label class="mt-5 block aspect-[16/10] rounded-2xl overflow-hidden bg-slate-100 relative cursor-pointer group">
+            <img id="areaPhoto" class="hidden absolute inset-0 w-full h-full object-cover" alt="" />
+            <span id="areaPhotoEmpty" class="absolute inset-0 grid place-items-center text-slate-400">
+              <span class="flex flex-col items-center gap-2 text-sm"><i data-lucide="camera" class="w-10 h-10"></i> <span data-i18n="spot.add">Tap to add photo</span></span>
+            </span>
+            <span class="absolute bottom-3 right-3 grid place-items-center w-10 h-10 rounded-full bg-black/60 text-white group-hover:bg-black/80"><i data-lucide="camera" class="w-5 h-5"></i></span>
+            <input id="areaPhotoInput" type="file" accept="image/*" class="sr-only" />
+          </label>
+          <label class="field-label mt-4 block" for="areaPhotoNotes" data-i18n="spot.notes">Notes for the driver</label>
+          <input id="areaPhotoNotes" class="field mt-1.5" data-i18n-ph="spot.notesPh" />
+          <button id="saveAreaPhoto" class="mt-4 w-full h-11 rounded-xl bg-brand-700 hover:bg-brand-800 text-white font-bold transition" data-i18n="spot.save">Save for my area</button>
+        </div>
+
+        <!-- Feedback -->
+        <div class="rounded-3xl bg-white shadow-card ring-1 ring-brand-100 p-6 flex flex-col">
+          <p class="section-eyebrow" data-i18n="fb.eyebrow">Household feedback</p>
+          <h3 class="font-display font-800 text-2xl text-brand-800" data-i18n="fb.title">How was our service?</h3>
+          <p class="mt-2 text-sm text-slate-600" data-i18n="fb.lead">Your rating helps the barangay improve waste collection.</p>
+          <div id="stars" class="mt-6 flex gap-2" role="radiogroup" data-i18n-aria="fb.rating" aria-label="Rating"></div>
+          <label class="field-label mt-6 block" for="feedbackText"><span data-i18n="fb.comments">Comments</span> <span class="font-normal text-slate-400" data-i18n="common.optional">(optional)</span></label>
+          <textarea id="feedbackText" rows="4" class="field mt-1.5" data-i18n-ph="fb.commentsPh"></textarea>
+          <button id="submitFeedback" class="mt-4 w-full h-11 rounded-xl bg-brand-700 hover:bg-brand-800 text-white font-bold transition" data-i18n="fb.submit">Submit Feedback</button>
+          <div class="mt-auto pt-6 flex items-center gap-3 text-sm text-slate-500">
+            <i data-lucide="message-square-heart" class="w-5 h-5 text-brand-600"></i>
+            <span><span data-i18n="fb.avgLabel">Average rating:</span> <b id="avgRating" class="text-brand-800">—</b></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== About the barangay (source: barangaysanbartolome.ph) ===== -->
+    <section id="about" class="scroll-mt-20 bg-white">
+      <div class="mx-auto max-w-7xl px-4 py-16">
+        <div class="grid lg:grid-cols-[1.25fr_1fr] gap-10">
+          <div>
+            <p class="section-eyebrow" data-i18n="about.eyebrow">About the barangay</p>
+            <h2 class="section-title">Barangay San Bartolome</h2>
+            <p class="mt-3 text-slate-600 max-w-2xl" data-i18n-html="about.lead">
+              San Bartolome is a barangay in Novaliches, District 5 of Quezon City.
+            </p>
+
+            <dl class="mt-7 grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div class="fact"><dt><span data-i18n="about.residents">Population</span><span data-i18n="about.census">2020 Census</span></dt><dd>51,148</dd></div>
+              <div class="fact"><dt><span data-i18n="about.hectares">Hectares</span><span data-i18n="about.landArea">Land area</span></dt><dd>240.62</dd></div>
+              <div class="fact"><dt><span data-i18n="about.created">Created</span><span data-i18n="about.createdDate">June 25, 1975</span></dt><dd>1975</dd></div>
+              <div class="fact"><dt><span data-i18n="about.streets">Streets</span><span data-i18n="about.across">Across the barangay</span></dt><dd>200</dd></div>
+            </dl>
+
+            <div class="mt-7 grid sm:grid-cols-2 gap-4">
+              <div class="rounded-2xl bg-brand-50 p-5">
+                <p class="flex items-center gap-2 font-sign uppercase tracking-wide text-lg text-brand-700"><i data-lucide="eye" class="w-5 h-5"></i> <span data-i18n="about.vision">Vision</span></p>
+                <p class="mt-2 text-sm text-slate-700" data-i18n="about.visionText">—</p>
+              </div>
+              <div class="rounded-2xl bg-brand-50 p-5">
+                <p class="flex items-center gap-2 font-sign uppercase tracking-wide text-lg text-brand-700"><i data-lucide="target" class="w-5 h-5"></i> <span data-i18n="about.mission">Mission</span></p>
+                <p class="mt-2 text-sm text-slate-700" data-i18n="about.missionText">—</p>
+              </div>
+            </div>
+
+            <div class="mt-4 rounded-2xl ring-1 ring-brand-200 p-5 flex flex-col sm:flex-row gap-4 sm:items-center">
+              <span class="grid place-items-center w-12 h-12 rounded-2xl bg-brand-600 text-white shrink-0"><i data-lucide="sprout" class="w-6 h-6"></i></span>
+              <div class="flex-1">
+                <p class="font-bold text-slate-800">Palitan Para sa Kalikasan</p>
+                <p class="text-sm text-slate-600" data-i18n="about.palitan">—</p>
+              </div>
+              <a href="https://www.barangaysanbartolome.ph/palitan-para-sa-kalikasan" target="_blank" rel="noopener" class="btn-outline shrink-0"><span data-i18n="about.learnMore">Learn more</span> <i data-lucide="arrow-up-right" class="w-4 h-4"></i></a>
+            </div>
+
+            <p class="mt-5 text-xs text-slate-500" data-i18n="about.bounds">—</p>
+          </div>
+
+          <!-- Contact card -->
+          <div class="rounded-3xl bg-brand-950 text-white p-6 lg:p-7 self-start shadow-card">
+            <p class="sign-badge">
+              <span>I</span>
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-label="love" role="img"><path d="M12 21s-7.5-4.6-10-9.4C.4 8.300 2.300 4.500 6 4.500c2.200 0 3.900 1.200 6 3.600 2.100-2.400 3.800-3.600 6-3.600 3.700 0 5.600 3.800 4 7.100C19.500 16.400 12 21 12 21z"/></svg>
+              <span>San Bartolome</span>
+            </p>
+            <h3 class="mt-4 font-sign uppercase tracking-wide text-2xl">Barangay Hall</h3>
+            <ul class="mt-4 space-y-4 text-sm">
+              <li class="contact-row"><i data-lucide="map-pin"></i>
+                <a href="https://www.google.com/maps/search/?api=1&query=San+Bartolome+Barangay+Hall+Quirino+Highway+Novaliches+Quezon+City" target="_blank" rel="noopener">San Bartolome Barangay Hall, Quirino Highway, Novaliches, Quezon City, Metro Manila 1116</a></li>
+              <li class="contact-row"><i data-lucide="phone"></i>
+                <span><a href="tel:+63282776775">(02) 8277 6775</a><br /><a href="tel:+639215417330">0921-541-7330</a></span></li>
+              <li class="contact-row"><i data-lucide="mail"></i>
+                <a href="mailto:brgysanbartolome2014@gmail.com">brgysanbartolome2014@gmail.com</a></li>
+              <li class="contact-row"><i data-lucide="clock"></i>
+                <span data-i18n-html="about.hours">Monday – Friday, 8:00 AM – 5:00 PM<br />Saturday, 8:00 AM – 12:00 PM</span></li>
+              <li class="contact-row"><i data-lucide="globe"></i>
+                <a href="https://www.barangaysanbartolome.ph/" target="_blank" rel="noopener">barangaysanbartolome.ph</a></li>
+              <li class="contact-row"><i data-lucide="facebook"></i>
+                <a href="https://www.facebook.com/brgysanbartolome2014" target="_blank" rel="noopener">facebook.com/brgysanbartolome2014</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+    </div>
+  </main>
+
+  <!-- ===== Footer ===== -->
+  <footer class="bg-brand-950 text-brand-100">
+    <div class="mx-auto max-w-7xl px-4 py-12 grid md:grid-cols-3 gap-8 text-sm">
+      <div class="flex items-start gap-3">
+        <img src="assets/img/brgy-logo.png" alt="" class="w-14 h-14 rounded-full" />
+        <div>
+          <p class="font-sign uppercase tracking-wide text-white text-xl">SB WasteTrack</p>
+          <p class="text-brand-200/80" data-i18n="foot.motto">A cleaner barangay, a better tomorrow.</p>
+          <button data-act="device-check" class="mt-4 inline-flex items-center gap-2 rounded-lg ring-1 ring-white/20 px-3 py-1.5 text-xs font-semibold hover:bg-white/10"><i data-lucide="smartphone" class="w-4 h-4"></i> <span data-i18n="device.open">Device check</span></button>
+        </div>
+      </div>
+      <div>
+        <p class="font-bold text-white" data-i18n="foot.links">Quick links</p>
+        <ul class="mt-2 space-y-1.5">
+          <li><a class="hover:text-accent-400" href="#track" data-i18n="nav.map">Live map</a></li>
+          <li><a class="hover:text-accent-400" href="#schedule" data-i18n="nav.schedule">Schedule</a></li>
+          <li><a class="hover:text-accent-400" href="#report" data-i18n="nav.report">Report garbage</a></li>
+          <li><a class="hover:text-accent-400" href="#about" data-i18n="nav.about">About</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="font-bold text-white">Barangay Hall</p>
+        <p class="mt-2 text-brand-200/80">Quirino Highway, Novaliches, Quezon City 1116</p>
+        <p class="mt-1 text-brand-200/80"><a class="hover:text-white" href="tel:+63282776775">(02) 8277 6775</a> · <a class="hover:text-white" href="tel:+639215417330">0921-541-7330</a></p>
+        <p class="mt-1 text-brand-200/80" data-i18n="foot.hours">Mon – Fri 8 AM – 5 PM · Sat 8 AM – 12 PM</p>
+        <p class="mt-3 text-brand-200/60 text-xs" data-i18n="foot.reminder">Reminder: segregate your waste and bring it out only on your collection day.</p>
+      </div>
+    </div>
+    <p class="border-t border-white/10 py-4 text-center text-xs text-brand-200/60">© <span id="year"></span> Barangay San Bartolome, Lungsod Quezon</p>
+  </footer>
+
+  <!-- ===== Mobile bottom nav ===== -->
+  <nav class="lg:hidden fixed bottom-0 inset-x-0 z-[1000] bg-white border-t border-slate-200 grid grid-cols-4 text-[11px] font-semibold text-slate-500" aria-label="Mobile">
+    <a href="#top" class="bottom-link"><i data-lucide="home" class="w-5 h-5"></i><span data-i18n="mnav.home">Home</span></a>
+    <a href="#track" class="bottom-link"><i data-lucide="map" class="w-5 h-5"></i><span data-i18n="mnav.track">Track</span></a>
+    <a href="#schedule" class="bottom-link"><i data-lucide="calendar" class="w-5 h-5"></i><span data-i18n="nav.schedule">Schedule</span></a>
+    <a href="#report" class="bottom-link text-red-600"><i data-lucide="megaphone" class="w-5 h-5"></i><span data-i18n="mnav.report">Report</span></a>
+  </nav>
+
+  <!-- ===== Notifications drawer ===== -->
+  <div id="drawer" class="fixed inset-0 z-[2000] hidden">
+    <div class="absolute inset-0 bg-black/40" data-close-drawer></div>
+    <aside class="absolute right-0 top-0 h-full w-full max-w-sm bg-white shadow-2xl flex flex-col drawer-panel">
+      <div class="flex items-center justify-between px-5 h-16 bg-brand-800 text-white">
+        <h2 class="font-display font-800 text-lg" data-i18n="notif.title">Notifications</h2>
+        <button data-close-drawer class="grid place-items-center w-9 h-9 rounded-lg hover:bg-white/10" data-i18n-aria="common.close" aria-label="Close"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <div class="px-5 py-3 flex items-center justify-between border-b border-slate-100 text-xs">
+        <button id="enablePush" class="font-semibold text-brand-700 hover:underline" data-i18n="notif.enable">Enable device alerts</button>
+        <button id="clearNotifs" class="font-semibold text-slate-500 hover:underline" data-i18n="notif.markRead">Mark all read</button>
+      </div>
+      <ul id="notifList" class="flex-1 overflow-y-auto divide-y divide-slate-100"></ul>
+    </aside>
+  </div>
+
+  <!-- ===== Modal ===== -->
+  <div id="modal" class="fixed inset-0 z-[2100] hidden items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/50" data-close-modal></div>
+    <div id="modalBody" role="dialog" aria-modal="true" class="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden modal-panel"></div>
+  </div>
+
+  <!-- ===== Toasts ===== -->
+  <div id="toasts" class="fixed z-[2200] bottom-24 lg:bottom-6 left-1/2 -translate-x-1/2 flex flex-col gap-2 items-center pointer-events-none"></div>
+
+  <!-- ===== Printable report (Management → Summary → Print / Save as PDF) ===== -->
+  <div id="printArea" aria-hidden="true"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+  <script src="assets/js/i18n.js"></script>
+  <script src="assets/js/routes.generated.js"></script>
+  <script src="assets/js/data.js"></script>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+# Not part of the website (kept on this computer only)
+
+# Source documents and photos of the route sheets
+*.pdf
+schedules and area/
+
+# Traccar server installer (too big for GitHub) and its readme
+traccar-setup.exe
+README.txt
+
+# Older copies and the separate phone-app version
+San Bartolome Garbage Truck Gps Tracker*.html
+GPS trucker app.html
+app/
+build-app.mjs
+
+# Settings that only apply to this laptop
+.claude/
+start-website.bat
+SB WasteTrack server.vbs
+
+node_modules/
